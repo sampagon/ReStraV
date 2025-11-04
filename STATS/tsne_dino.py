@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 
-from utils import find_videos, embed_frames
+from utils import find_videos
 
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
@@ -14,13 +14,13 @@ sys.path.insert(0, str(repo_root))
 import dinov2_features as d2
 
 batch_size = 64
-device = "cuda"
+device = "cuda:2"
 
 real_root = Path("DATA/TRAINING_DATA/REAL")
 fake_root = Path("DATA/TRAINING_DATA/FAKE")
 
 real = find_videos(real_root, limit=60)
-fake = find_videos(fake_root, keys=["pika", "t2vz", "vc2", "ms"], limit=60)
+fake = find_videos(fake_root, keys=["pika", "t2vz", "vc2", "ms"], limit=15)
 fake_all = [p for lst in fake.values() for p in lst]
 
 print("Extracting REAL frame embeddings...")
