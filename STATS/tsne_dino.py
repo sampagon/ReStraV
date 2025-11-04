@@ -4,6 +4,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import sys
 from pathlib import Path
+from tqdm import tqdm
 
 from utils import find_videos, embed_frames
 
@@ -23,9 +24,20 @@ fake = find_videos(fake_root, keys=["pika", "t2vz", "vc2", "ms"], limit=60)
 fake_all = [p for lst in fake.values() for p in lst]
 
 print("Extracting REAL frame embeddings...")
-Z_real = embed_frames(real, device=device, batch_size=batch_size)
+Z_real = []
+for i in tqdm(range(0, len(real), batch_size), desc="Encoding videos", ncols=80):
+    batch = real[i:i+batch_size]
+    Z = d2.extract_dinov2_embeddings(batch, device=device)
+    Z_real.append(Z.cpu())
+torch.cat(Z_real, dim=0)
+
 print("Extracting FAKE frame embeddings...")
-Z_fake = embed_frames(fake_all, device=device, batch_size=batch_size)
+Z_fake = []
+for i in tqdm(range(0, len(real), batch_size), desc="Encoding videos", ncols=80):
+    batch = real[i:i+batch_size]
+    Z = d2.extract_dinov2_embeddings(batch, device=device)
+    Z_fake.append(Z.cpu())
+torch.cat(Z_fake, dim=0)
 
 Nr, T, D = Z_real.shape
 Nf = Z_fake.shape[0]
@@ -42,7 +54,6 @@ Tm = T - 2
 X_steps = torch.cat([X_steps_real, X_steps_fake], dim=0)  
 X_tsne  = X_steps.reshape(N * Tm, 2).numpy()       
 
-# Labels to color and to connect each video's steps
 video_labels = np.array([0]*Nr + [1]*Nf)     
 step_labels  = np.repeat(video_labels, Tm)                
 video_ids    = np.repeat(np.arange(N), Tm)             
@@ -61,7 +72,6 @@ for vid in range(N):
     plt.plot(pts[:, 0], pts[:, 1], '-', lw=0.6, alpha=0.5, color=c)
     plt.scatter(pts[:, 0], pts[:, 1], s=8, alpha=0.6, color=c)
 
-# legend proxies
 plt.scatter([], [], s=20, color=c_real, label="Natural")
 plt.scatter([], [], s=20, color=c_fake, label="Synthetic")
 
