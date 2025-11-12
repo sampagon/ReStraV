@@ -1,57 +1,58 @@
-import torch
 import numpy as np
+import h5py
 import matplotlib.pyplot as plt
-import sys
-from pathlib import Path
-from tqdm import tqdm
 from scipy.stats import gaussian_kde
+from tqdm import tqdm
+from pathlib import Path
 
-from utils import find_videos
+#Load data
+h5_path = "../DATA/training_features.h5"
 
-repo_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repo_root))
+with h5py.File(h5_path, "r") as f:
+    X = f["features"][:] 
+    y = f["label"][:] 
+    paths = f["path"][:].astype(str)
 
-import dinov2_features as d2
+print(f"Loaded {len(X)} samples from {h5_path}")
 
-batch_size = 64
-device = "cuda:2"
+#Filter fake paths by interested models
+allowed_models = [
+    "pika_videos_example",
+    "vc2_videos_example",
+    "t2vz_videos_example",
+    "ms_videos_example"
+]
 
-real_root = Path("../DATA/TRAINING_DATA/REAL")
-fake_root = Path("../DATA/TRAINING_DATA/FAKE")
+mask_real = y == 1
+mask_fake = np.array([any(m in p for m in allowed_models) for p in paths]) & (y == 0)
 
-real = find_videos(real_root, limit=10000)
-fake = find_videos(fake_root, keys=["pika", "t2vz", "vc2", "ms"], limit=2500)
-fake_all = [p for lst in fake.values() for p in lst]
+real_stats = X[mask_real][:, -8:]
+fake_stats = X[mask_fake][:, -8:]
 
-print("Extracting REAL frame embeddings...")
-Z_real = []
-for i in tqdm(range(0, len(real), batch_size), desc="Encoding videos", ncols=80):
-    batch = real[i:i+batch_size]
-    Z = d2.extract_dinov2_embeddings(batch, device=device)
-    Z_real.append(Z.cpu())
-Z_real = torch.cat(Z_real, dim=0)
+print(f"Filtered fake samples: {len(fake_stats)} (from allowed models)")
+print(f"Real samples: {len(real_stats)}")
 
-print("Extracting FAKE frame embeddings...")
-Z_fake = []
-for i in tqdm(range(0, len(real), batch_size), desc="Encoding videos", ncols=80):
-    batch = fake_all[i:i+batch_size]
-    Z = d2.extract_dinov2_embeddings(batch, device=device)
-    Z_fake.append(Z.cpu())
-Z_fake = torch.cat(Z_fake, dim=0)
+#Balance classes (equal priors)
+n_balanced = min(len(real_stats), len(fake_stats))
+rng = np.random.default_rng(seed=42)
+sel_real = rng.choice(len(real_stats), n_balanced, replace=False)
+sel_fake = rng.choice(len(fake_stats), n_balanced, replace=False)
 
-print(f"real shape: {Z_real.shape}")
-print(f"fake shape: {Z_fake.shape}")
+real_stats = real_stats[sel_real]
+fake_stats = fake_stats[sel_fake]
 
-fake_stats = d2.features_from_Z(Z_fake)[:, -8:]
-real_stats = d2.features_from_Z(Z_real)[:, -8:]
+print(f"Balanced: {n_balanced} real vs {n_balanced} fake samples")
 
-labels = [r'$\mu_d$', r'$min_d$', r'$max_d$', r'$\sigma^2_d$',
-          r'$\mu_\theta$', r'$min_\theta$', r'$max_\theta$', r'$\sigma^2_\theta$']
+#Plot
+labels = [
+    r'$\mu_d$', r'$min_d$', r'$max_d$', r'$\sigma^2_d$',
+    r'$\mu_\theta$', r'$min_\theta$', r'$max_\theta$', r'$\sigma^2_\theta$'
+]
 
 fig, axes = plt.subplots(2, 4, figsize=(12, 4))
 axes = axes.ravel()
 
-for i in range(8):
+for i in tqdm(range(8), desc="Plotting distributions"):
     ax = axes[i]
     x_real = real_stats[:, i]
     x_fake = fake_stats[:, i]
@@ -75,8 +76,7 @@ for i in range(8):
     ax.set_xlabel("Value")
 
 fig.legend(['Natural', 'AI-Generated'], loc='lower center', ncol=2, fontsize=12)
-
 plt.tight_layout(rect=[0, 0.1, 1, 1])
 plt.savefig("distributions_dino.png", dpi=300, bbox_inches='tight')
 plt.close()
-print("Saved plot as .png")
+print("Saved plot as distributions_dino.png")
