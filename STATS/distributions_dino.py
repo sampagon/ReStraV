@@ -19,8 +19,8 @@ device = "cuda:2"
 real_root = Path("../DATA/TRAINING_DATA/REAL")
 fake_root = Path("../DATA/TRAINING_DATA/FAKE")
 
-real = find_videos(real_root, limit=500)
-fake = find_videos(fake_root, keys=["pika", "t2vz", "vc2", "ms"], limit=125)
+real = find_videos(real_root, limit=10000)
+fake = find_videos(fake_root, keys=["pika", "t2vz", "vc2", "ms"], limit=2500)
 fake_all = [p for lst in fake.values() for p in lst]
 
 print("Extracting REAL frame embeddings...")
