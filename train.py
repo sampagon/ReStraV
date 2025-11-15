@@ -170,4 +170,7 @@ print(f"Precision: {precision:.3f}  Recall: {recall:.3f}  F1: {f1:.3f}  AUC: {au
 print("Confusion matrix (rows=true [0,1], cols=pred [0,1]):")
 print(cm)
 
-torch.save(model, "model.pt")
+torch.save(model.state_dict(), "model.pt")
+np.save("mean.npy", mean)
+np.save("std.npy", std)
+np.save("best_tau.npy", best_tau)
